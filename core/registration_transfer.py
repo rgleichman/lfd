@@ -35,3 +35,14 @@ class UnifiedRegistrationAndTrajectoryTransferer(RegistrationAndTrajectoryTransf
     def transfer(self, demo, test_scene_state, plotting=False):
         # TODO
         raise NotImplementedError
+
+class BootstrapRegistrationAndTrajectoryTransferer(RegistrationAndTrajectoryTransferer):
+    def transfer(self, demo, test_scene_state, plotting=False, get_ThinPlateSpline=False):
+        reg = self.registration_factory.register(demo, test_scene_state)
+        print 'computed registration'
+        test_aug_traj = self.trajectory_transferer.transfer(reg, demo, plotting=plotting)
+        print 'computed test traj'
+        if get_ThinPlateSpline:
+            return test_aug_traj, reg.f
+        else:
+            return test_aug_traj

@@ -22,6 +22,8 @@ from rapprentice import eval_util, util
 import numpy as np
 import argparse, sys, h5py, pprint
 
+import IPython as ipy
+
 # TRAJOPT CONSTANTS
 TRAJOPT_DEFAULTS = {'beta_pos'           : 1000000.0,
                     'beta_rot'           : 100.0,
@@ -72,19 +74,21 @@ class GlobalVars:
     n_orig_transfers = 0
     n_transfers = 0
 
-        
+
 def initialize(args):           
     print "reading actionfile"
     try:
         actf = h5py.File(args.actionfile)
         GlobalVars.demos = group_or_dataset_to_obj(actf)
+    except:
+        ipy.embed()
     finally:
         actf.close()
     print "intializing simulation"
     GlobalVars.bend_coefs = np.around(loglinspace(args.bend_coef_init, args.bend_coef_final, args.n_iter), 
                                       BEND_COEF_DIGITS)
     init_rope_xyz = GlobalVars.demos.values()[0].scene_state.transfer_cld()
-    table_height = init_rope_xyz[:,2].mean() - .02
+    table_height = init_rope_xyz[:,2].mean() - .045
     
     sim_objs = []
     sim_objs.append(XmlSimulationObject("robots/pr2-beta-static.zae", dynamic=False))
@@ -135,7 +139,7 @@ def add_trace(trace, args):
     for demo in trace:
         try:
             x = demo.parent.parent
-        except AttributeError:
+        except AttributeError as ae:
             n_orig += 1
         demo.compute_solver_data(GlobalVars.bend_coefs)
         GlobalVars.demos[demo.name] = demo
@@ -173,6 +177,7 @@ def do_single_task(rope_nodes, action_selection, reg_and_traj_transferer, args):
     for i_step in range(args.num_steps):
         sim_state = sim.get_state()
         sim.set_state(sim_state)
+        sim_util.reset_arms_to_side(sim)
         scene_state = lfd_env.observe_scene()
 
         try:
@@ -186,15 +191,31 @@ def do_single_task(rope_nodes, action_selection, reg_and_traj_transferer, args):
             return (False,)
 
         best_root_action = agenda[0]
+        if isinstance(GlobalVars.demos[best_root_action], BootstrapDemonstration):
+            print "about to run BootstrapDemonstration"
+            print GlobalVars.demos[best_root_action].name
+            if GlobalVars.demos[best_root_action].aug_traj.lr2open_finger_traj == None:
+                print "no open/close info?"
+                ipy.embed()
+            elif True not in GlobalVars.demos[best_root_action].aug_traj.lr2open_finger_traj['r'] and True not in GlobalVars.demos[best_root_action].aug_traj.lr2open_finger_traj['l']:
+                print "no non-open states?"
+                ipy.embed()
+            elif True not in GlobalVars.demos[best_root_action].aug_traj.lr2close_finger_traj['r'] and True not in GlobalVars.demos[best_root_action].aug_traj.lr2close_finger_traj['l']:
+                print "no closed states?"
+                ipy.embed()
+
         test_aug_traj = reg_and_traj_transferer.transfer(GlobalVars.demos[best_root_action], scene_state, plotting=args.plotting)
         feasible, misgrasp = lfd_env.execute_augmented_trajectory(test_aug_traj, 
                                                                   step_viewer=args.animation, 
                                                                   interactive=args.interactive)
         sim.settle()
-        if misgrasp: continue
+        if misgrasp: 
+            print "\nmisgrasp: BootstrapDemonstration is {}\n".format(isinstance(GlobalVars.demos[best_root_action], BootstrapDemonstration))
+            # ipy.embed()
+            continue
         exec_trace.append(BootstrapDemonstration(GlobalVars.ID, scene_state, test_aug_traj, 
                                                  parent_demo = GlobalVars.demos[best_root_action]))
-        GlobalVars.ID +=1 
+        GlobalVars.ID +=1
         if is_knot(rope.rope.GetControlPoints()):
             sim.remove_objects([rope])
             return (True, exec_trace)
@@ -212,6 +233,7 @@ def train(args):
             action_selection, reg_and_traj_transferer = add_trace(exec_result[1], args)            
         if i+1 in args.train_sizes:
             add_obj_to_group(resultf, str(i+1), GlobalVars.demos)
+        print "trained iter {}".format(i)
         
 def main():
     args = parse_input_args()

@@ -376,8 +376,7 @@ def setup_lfd_environment_sim(args):
     actions = h5py.File(args.eval.actionfile, 'r')
     
     init_rope_xyz = GlobalVars.demos.values()[0].scene_state.transfer_cld()
-    table_height = init_rope_xyz[:,2].mean() - .02
-    table_height = init_rope_xyz[:,2].mean() - .02
+    table_height = init_rope_xyz[:,2].mean() - .045
     
     sim_objs = []
     sim_objs.append(XmlSimulationObject("robots/pr2-beta-static.zae", dynamic=False))

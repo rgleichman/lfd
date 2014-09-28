@@ -9,6 +9,8 @@ from tpsopt.cuda_funcs import reset_cuda
 import trajoptpy
 import time
 
+import IPython as ipy
+
 def parse_input_args():
     parser = build_parser()
     parser.add_argument("--train_sizes", type=int, nargs="+", default=None,
@@ -33,7 +35,10 @@ def main():
     
     setup_log_file(args)
     print 'reading action data'
-    bootstrap_data = fname_to_obj(args.eval.actionfile)
+    try:
+        bootstrap_data = fname_to_obj(args.eval.actionfile)
+    except:
+        ipy.embed()
     print 'max library size:\t{}'.format(max(len(x) for x in bootstrap_data.values()))
     scripts.eval.GlobalVars.demos = bootstrap_data.values()[0]
     trajoptpy.SetInteractive(args.interactive)

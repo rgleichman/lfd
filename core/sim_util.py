@@ -337,6 +337,7 @@ def reset_arms_to_side(sim_env):
         joint_ind = sim_env.robot.GetJoint("%s_gripper_l_finger_joint"%lr).GetDOFIndex()
         start_val = sim_env.robot.GetDOFValues([joint_ind])[0]
         sim_env.robot.SetDOFValues([open_angle], [joint_ind])
+    sim_env.step()
 
 def arm_moved(joint_traj):    
     if len(joint_traj) < 2: return False

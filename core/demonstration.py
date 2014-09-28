@@ -39,7 +39,7 @@ class Demonstration(object):
 
 class BootstrapDemonstration(Demonstration):
 
-    def __init__(self, UID, scene_state, aug_traj, solver_data = None, parent_demo = None):
+    def __init__(self, UID, scene_state, aug_traj, solver_data=None, parent_demo=None):
         if parent_demo is None:
             parent_name = 'root'
         else:
@@ -47,6 +47,12 @@ class BootstrapDemonstration(Demonstration):
         super(BootstrapDemonstration, self).__init__('{}->{}'.format(parent_name, UID),
                                                      scene_state, aug_traj, solver_data = solver_data)
         self.parent = parent_demo
+        # if self.name == "demo10-seg01->1->7->18":
+        #     print "creating problem demo"
+        #     ipy.embed()
+        # if self.name == "demo10-seg01->1->7":
+        #     print "creating potential problem parent"
+        #     ipy.embed()
 
 class SceneState(object):
     ids = set()

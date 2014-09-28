@@ -9,6 +9,7 @@ from tpsopt.file_utils import *
 import sim_util
 import sys
 
+import IPython as ipy
 
 def format_action_file(actions, raw_file=None, ground_truth=False, upsample=0, upsample_rad=1, downsample_size=DS_SIZE,
                        bend_limits = DEFAULT_LAMBDA, n_iter=N_ITER_CHEAP):
@@ -59,7 +60,7 @@ def format_action_file(actions, raw_file=None, ground_truth=False, upsample=0, u
         aug_traj = AugmentedTrajectory(lr2arm_traj=lr2arm_traj, lr2finger_traj=lr2finger_traj, lr2ee_traj=lr2ee_traj, lr2open_finger_traj=lr2open_finger_traj, lr2close_finger_traj=lr2close_finger_traj)
         bend_coefs = np.around(loglinspace(bend_coef_init, bend_coef_final, n_iter), 
                                BEND_COEF_DIGITS)
-
+        action = str(action)
         demo = Demonstration(action, scene_state, aug_traj)
         demo.compute_solver_data(bend_coefs)
         add_obj_to_group(raw_file, action, demo)

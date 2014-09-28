@@ -61,9 +61,39 @@ class PoseTrajectoryTransferer(TrajectoryTransferer):
         for lr in 'lr':
             if lr in demo.aug_traj.lr2arm_traj and sim_util.arm_moved(demo.aug_traj.lr2arm_traj[lr]):
                 active_lr += lr
-        _, timesteps_rs = sim_util.unif_resample(np.c_[(1./JOINT_LENGTH_PER_STEP) * np.concatenate([demo.aug_traj.lr2arm_traj[lr] for lr in active_lr], axis=1), 
+
+        #------NEW------#
+        import IPython as ipy
+        open_or_close_finger_traj = np.zeros(demo.aug_traj.n_steps, dtype=bool)
+
+        if demo.aug_traj.lr2open_finger_traj is not None:
+            for lr in demo.aug_traj.lr2open_finger_traj.keys():
+                open_or_close_finger_traj = np.logical_or(open_or_close_finger_traj, demo.aug_traj.lr2open_finger_traj[lr])
+        if demo.aug_traj.lr2close_finger_traj is not None:
+            for lr in demo.aug_traj.lr2close_finger_traj.keys():
+                open_or_close_finger_traj = np.logical_or(open_or_close_finger_traj, demo.aug_traj.lr2close_finger_traj[lr])
+        open_or_close_inds = np.where(open_or_close_finger_traj)[0]
+
+        timesteps_rs = []
+
+        for (start_ind, end_ind) in zip(np.r_[0, open_or_close_inds], np.r_[open_or_close_inds+1, demo.aug_traj.n_steps]):
+            _, mini_timesteps_rs =sim_util.unif_resample(np.c_[(1./JOINT_LENGTH_PER_STEP) * np.concatenate([demo.aug_traj.lr2arm_traj[lr][start_ind:end_ind] for lr in active_lr], axis=1), 
+                                                               (1./FINGER_CLOSE_RATE) * np.concatenate([demo.aug_traj.lr2finger_traj[lr][start_ind:end_ind] for lr in active_lr], axis=1)], 
+                                                                1.)
+            print "transferring"
+            if mini_timesteps_rs[0] in timesteps_rs:
+                mini_timesteps_rs = mini_timesteps_rs[1:]
+            timesteps_rs = np.r_[timesteps_rs, mini_timesteps_rs+start_ind]
+
+        #now, hopefully, timesteps_rs should include exactly those timesteps and poses where the gripper opens/closes, and so when get_resampled_traj(timesteps_rs)
+        #   is called, the open/close timesteps will be transferred to exactly the corresponding poses, rather than ones slightly before or after
+        # 
+        #------OLD------#
+        _, timesteps_rs_v2 = sim_util.unif_resample(np.c_[(1./JOINT_LENGTH_PER_STEP) * np.concatenate([demo.aug_traj.lr2arm_traj[lr] for lr in active_lr], axis=1), 
                                                        (1./FINGER_CLOSE_RATE) * np.concatenate([demo.aug_traj.lr2finger_traj[lr] for lr in active_lr], axis=1)], 
                                                  1.)
+        #---------------#
+
         demo_aug_traj_rs = demo.aug_traj.get_resampled_traj(timesteps_rs)
 
         if self.init_trajectory_transferer:
@@ -145,9 +175,39 @@ class FingerTrajectoryTransferer(TrajectoryTransferer):
         for lr in 'lr':
             if lr in demo.aug_traj.lr2arm_traj and sim_util.arm_moved(demo.aug_traj.lr2arm_traj[lr]):
                 active_lr += lr
-        _, timesteps_rs = sim_util.unif_resample(np.c_[(1./JOINT_LENGTH_PER_STEP) * np.concatenate([demo.aug_traj.lr2arm_traj[lr] for lr in active_lr], axis=1), 
+
+        #------NEW------#
+        import IPython as ipy
+        open_or_close_finger_traj = np.zeros(demo.aug_traj.n_steps, dtype=bool)
+
+        if demo.aug_traj.lr2open_finger_traj is not None:
+            for lr in demo.aug_traj.lr2open_finger_traj.keys():
+                open_or_close_finger_traj = np.logical_or(open_or_close_finger_traj, demo.aug_traj.lr2open_finger_traj[lr])
+        if demo.aug_traj.lr2close_finger_traj is not None:
+            for lr in demo.aug_traj.lr2close_finger_traj.keys():
+                open_or_close_finger_traj = np.logical_or(open_or_close_finger_traj, demo.aug_traj.lr2close_finger_traj[lr])
+        open_or_close_inds = np.where(open_or_close_finger_traj)[0]
+
+        timesteps_rs = []
+
+        for (start_ind, end_ind) in zip(np.r_[0, open_or_close_inds], np.r_[open_or_close_inds+1, demo.aug_traj.n_steps]):
+            _, mini_timesteps_rs =sim_util.unif_resample(np.c_[(1./JOINT_LENGTH_PER_STEP) * np.concatenate([demo.aug_traj.lr2arm_traj[lr][start_ind:end_ind] for lr in active_lr], axis=1), 
+                                                               (1./FINGER_CLOSE_RATE) * np.concatenate([demo.aug_traj.lr2finger_traj[lr][start_ind:end_ind] for lr in active_lr], axis=1)], 
+                                                                1.)
+            print "transferring"
+            if mini_timesteps_rs[0] in timesteps_rs:
+                mini_timesteps_rs = mini_timesteps_rs[1:]
+            timesteps_rs = np.r_[timesteps_rs, mini_timesteps_rs+start_ind]
+
+        #now, hopefully, timesteps_rs should include exactly those timesteps and poses where the gripper opens/closes, and so when get_resampled_traj(timesteps_rs)
+        #   is called, the open/close timesteps will be transferred to exactly the corresponding poses, rather than ones slightly before or after
+        # 
+        #------OLD------#
+        _, timesteps_rs_v2 = sim_util.unif_resample(np.c_[(1./JOINT_LENGTH_PER_STEP) * np.concatenate([demo.aug_traj.lr2arm_traj[lr] for lr in active_lr], axis=1), 
                                                        (1./FINGER_CLOSE_RATE) * np.concatenate([demo.aug_traj.lr2finger_traj[lr] for lr in active_lr], axis=1)], 
                                                  1.)
+        #---------------#
+
         demo_aug_traj_rs = demo.aug_traj.get_resampled_traj(timesteps_rs)
 
         if self.init_trajectory_transferer:
@@ -167,7 +227,10 @@ class FingerTrajectoryTransferer(TrajectoryTransferer):
             manip_name += arm_name + "+" + finger_name
             
             if self.init_trajectory_transferer:
-                init_traj = np.c_[init_traj, warm_init_traj.lr2arm_traj[lr], warm_init_traj.lr2finger_traj[lr]]
+                try:
+                    init_traj = np.c_[init_traj, warm_init_traj.lr2arm_traj[lr], warm_init_traj.lr2finger_traj[lr]]
+                except:
+                    ipy.embed()
             else:
                 init_traj = np.c_[init_traj, demo_aug_traj_rs.lr2arm_traj[lr], demo_aug_traj_rs.lr2finger_traj[lr]]
             
@@ -219,4 +282,8 @@ class FingerTrajectoryTransferer(TrajectoryTransferer):
                 handles.extend(sim_util.draw_finger_pts_traj(self.sim, flr2test_finger_pts_traj, (0,0,1)))
             self.sim.viewer.Step()
         
+        test_aug_traj.demo_traj = demo.aug_traj
+        test_aug_traj.timesteps_rs = timesteps_rs
+        test_aug_traj.reg = reg
+
         return test_aug_traj

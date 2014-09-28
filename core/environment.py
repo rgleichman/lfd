@@ -6,6 +6,8 @@ from rapprentice import animate_traj, ropesim, eval_util
 import numpy as np
 import demonstration, simulation_object, sim_util
 
+import IPython as ipy
+
 class LfdEnvironment(object):
     def __init__(self, world, sim, downsample_size=0):
         """Inits LfdEnvironment
@@ -21,6 +23,7 @@ class LfdEnvironment(object):
     
     def execute_augmented_trajectory(self, aug_traj, step_viewer=1, interactive=False, sim_callback=None, check_feasible=False):
         open_or_close_finger_traj = np.zeros(aug_traj.n_steps, dtype=bool)
+
         if aug_traj.lr2open_finger_traj is not None:
             for lr in aug_traj.lr2open_finger_traj.keys():
                 open_or_close_finger_traj = np.logical_or(open_or_close_finger_traj, aug_traj.lr2open_finger_traj[lr])
@@ -33,6 +36,7 @@ class LfdEnvironment(object):
         feasible = True
         misgrasp = False
         lr2gripper_open = {'l':True, 'r':True}
+        # ipy.embed()
         for (start_ind, end_ind) in zip(np.r_[0, open_or_close_inds], np.r_[open_or_close_inds+1, aug_traj.n_steps]):
             if aug_traj.lr2open_finger_traj is not None:
                 for lr in aug_traj.lr2open_finger_traj.keys():
@@ -47,8 +51,21 @@ class LfdEnvironment(object):
                 for lr in aug_traj.lr2close_finger_traj.keys():
                     if aug_traj.lr2close_finger_traj[lr][start_ind]:
                         n_cnts = len(self.sim.constraints[lr])
+
+                        manip_name = {'l':'leftarm', 'r':'rightarm'}[lr]
+
+                        init_vals = self.sim.robot.GetManipulator(manip_name).GetArmDOFValues()
+
                         self.world.close_gripper(lr, step_viewer=step_viewer)
+
+                        final_vals = self.sim.robot.GetManipulator(manip_name).GetArmDOFValues()
+
                         misgrasp |= len(self.sim.constraints[lr]) == n_cnts
+
+                        if misgrasp:
+                            print "misgrasp on {} gripper".format(lr)
+                            ipy.embed()
+
                         lr2gripper_open[lr] = False
             # don't execute trajectory for finger joint if the corresponding gripper is closed
             active_inds = np.ones(len(dof_inds), dtype=bool)

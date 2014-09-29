@@ -194,7 +194,6 @@ def do_single_task(rope_nodes, action_selection, reg_and_traj_transferer, args):
 
         best_root_action = agenda[0]
 
-
         if isinstance(GlobalVars.demos[best_root_action], BootstrapDemonstration):
             print "about to run BootstrapDemonstration"
             print GlobalVars.demos[best_root_action].name

@@ -11,6 +11,8 @@ from tpsopt.registration import loglinspace
 from tpsopt.batchtps import GPUContext, TgtContext, SrcContext, batch_tps_rpm_bij
 from tpsopt.transformations import EmptySolver, TPSSolver
 
+from rapprentice.registration import Composition #different from tpsopt.transformations version - has functions to transform hmats. TODO: fix this in tpsopt
+
 import time
 
 import IPython as ipy
@@ -324,3 +326,67 @@ class TpsnRpmRegistrationFactory(RegistrationFactory):
     def cost(self, demo, test_scene_state):
         # TODO
         raise NotImplementedError
+
+class BootstrapGpuTpsRpmBijRegistrationFactory(GpuTpsRpmBijRegistrationFactory):
+
+    def register(self, demo, test_scene_state, plotting=False, plot_cb=None):
+        """
+        TODO: use em_iter (?)
+        """
+        if self.prior_fn is not None:
+            vis_cost_xy = self.prior_fn(demo.scene_state, test_scene_state)
+        else:
+            vis_cost_xy = None
+
+        try:
+            old_cloud = demo.get_cloud()[:,:3]
+        except AttributeError: #demo is not a BootstrapDemonstration
+            old_cloud = demo.scene_state.cloud[:,:3]
+        new_cloud = test_scene_state.cloud[:,:3]
+        x_nd = np.array(old_cloud)
+        y_md = np.array(new_cloud)
+        if len(old_cloud) > MAX_CLD_SIZE:
+            x_nd = x_nd[np.random.choice(range(len(x_nd)), size=MAX_CLD_SIZE, replace=False)]
+            #x_nd = old_cloud[np.random.random_integers(len(old_cloud)-1, size=min(MAX_CLD_SIZE, len(old_cloud)))]
+        if len(new_cloud) > MAX_CLD_SIZE:
+            y_md = y_md[np.random.choice(range(len(y_md)), size=MAX_CLD_SIZE, replace=False)]
+            #y_md = new_cloud[np.random.random_integers(len(new_cloud)-1, size=min(MAX_CLD_SIZE, len(new_cloud)))]
+
+        # if len(x_nd) != len(old_cloud) or len(y_md) != len(new_cloud):
+        #     ipy.embed()
+
+        scaled_x_nd, src_params = registration.unit_boxify(x_nd)
+        scaled_y_md, targ_params = registration.unit_boxify(y_md)
+
+        x_K_nn = tps_kernel_matrix(scaled_x_nd)
+        fsolve = self.f_empty_solver.get_solver(scaled_x_nd, x_K_nn, self.exact_bend_coefs)
+        y_K_nn = tps_kernel_matrix(scaled_y_md)
+        gsolve = self.g_empty_solver.get_solver(scaled_y_md, y_K_nn, self.exact_bend_coefs)
+
+        x_weights = np.ones(len(x_nd)) * 1.0/len(x_nd)
+        (f,g), corr = tpsopt.registration.tps_rpm_bij(scaled_x_nd, scaled_y_md, fsolve, gsolve,
+                                    n_iter = N_ITER_EXACT,
+                                    reg_init = EXACT_LAMBDA[0],
+                                    reg_final = EXACT_LAMBDA[1],
+                                    rad_init = self.rad_init,
+                                    rad_final = self.rad_final,
+                                    rot_reg = self.rot_reg,
+                                    outlierprior = self.outlierprior,
+                                    outlierfrac = self.outlierfrac,
+                                    vis_cost_xy = vis_cost_xy,
+                                    return_corr = True,
+                                    check_solver = False)
+        bending_cost = registration.tps_reg_cost(f)
+        f = registration.unscale_tps(f, src_params, targ_params)
+        f._bending_cost = bending_cost # TODO: do this properly
+        try:
+            print "registration: creating Composition"
+            fs = demo.get_warps() + [f] 
+            fnew = Composition(fs)
+            print "registration: finished"
+        except AttributeError: #demo is not a BootstrapDemonstration
+            fnew = f
+            from demonstration import BootstrapDemonstration
+            if isinstance(demo, BootstrapDemonstration):
+                ipy.embed()
+        return Registration(demo, test_scene_state, fnew, corr, g=g)

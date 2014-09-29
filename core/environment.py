@@ -63,8 +63,8 @@ class LfdEnvironment(object):
                         misgrasp |= len(self.sim.constraints[lr]) == n_cnts
 
                         if misgrasp:
-                            print "misgrasp on {} gripper".format(lr)
-                            ipy.embed()
+                            print "lfd_env: misgrasp on {} gripper".format(lr)
+                            # ipy.embed()
 
                         lr2gripper_open[lr] = False
             # don't execute trajectory for finger joint if the corresponding gripper is closed

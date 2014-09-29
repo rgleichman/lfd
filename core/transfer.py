@@ -80,7 +80,6 @@ class PoseTrajectoryTransferer(TrajectoryTransferer):
             _, mini_timesteps_rs =sim_util.unif_resample(np.c_[(1./JOINT_LENGTH_PER_STEP) * np.concatenate([demo.aug_traj.lr2arm_traj[lr][start_ind:end_ind] for lr in active_lr], axis=1), 
                                                                (1./FINGER_CLOSE_RATE) * np.concatenate([demo.aug_traj.lr2finger_traj[lr][start_ind:end_ind] for lr in active_lr], axis=1)], 
                                                                 1.)
-            print "transferring"
             if mini_timesteps_rs[0] in timesteps_rs:
                 mini_timesteps_rs = mini_timesteps_rs[1:]
             timesteps_rs = np.r_[timesteps_rs, mini_timesteps_rs+start_ind]
@@ -194,7 +193,6 @@ class FingerTrajectoryTransferer(TrajectoryTransferer):
             _, mini_timesteps_rs =sim_util.unif_resample(np.c_[(1./JOINT_LENGTH_PER_STEP) * np.concatenate([demo.aug_traj.lr2arm_traj[lr][start_ind:end_ind] for lr in active_lr], axis=1), 
                                                                (1./FINGER_CLOSE_RATE) * np.concatenate([demo.aug_traj.lr2finger_traj[lr][start_ind:end_ind] for lr in active_lr], axis=1)], 
                                                                 1.)
-            print "transferring"
             if mini_timesteps_rs[0] in timesteps_rs:
                 mini_timesteps_rs = mini_timesteps_rs[1:]
             timesteps_rs = np.r_[timesteps_rs, mini_timesteps_rs+start_ind]

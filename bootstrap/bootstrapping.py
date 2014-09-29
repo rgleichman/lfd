@@ -5,7 +5,7 @@ from core.constants import ROPE_RADIUS, MAX_ACTIONS_TO_TRY, DEFAULT_LAMBDA, N_IT
 from core.demonstration import GroundTruthRopeSceneState, AugmentedTrajectory, Demonstration, BootstrapDemonstration
 from core.simulation import DynamicSimulationRobotWorld
 from core.environment import GroundTruthRopeLfdEnvironment
-from core.registration import GpuTpsRpmBijRegistrationFactory, loglinspace
+from core.registration import BootstrapGpuTpsRpmBijRegistrationFactory, loglinspace
 from core.transfer import PoseTrajectoryTransferer, FingerTrajectoryTransferer
 from core.registration_transfer import TwoStepRegistrationAndTrajectoryTransferer
 from core.action_selection import SoftmaxActionSelection
@@ -13,6 +13,8 @@ from core.file_utils import group_or_dataset_to_obj, add_obj_to_group
 from core.simulation_object import XmlSimulationObject, BoxSimulationObject, RopeSimulationObject
 
 from rapprentice.knot_classifier import isKnot as is_knot, calculateCrossings
+
+from rapprentice.registration import Composition, ThinPlateSpline, Affine, Transformation
 
 from tpsopt.cuda_funcs import reset_cuda
 import trajoptpy
@@ -155,7 +157,7 @@ def compute_action_selector(args):
     if args.transfer_type != 'derived-traj':
         print 'only derived trajcetories are implemented currently'
         raise NotImplementedError('only derived trajcetories are implemented currently')
-    reg_factory          = GpuTpsRpmBijRegistrationFactory(GlobalVars.demos)
+    reg_factory          = BootstrapGpuTpsRpmBijRegistrationFactory(GlobalVars.demos)
     init_transferer      = PoseTrajectoryTransferer(GlobalVars.sim, **TRAJOPT_DEFAULTS)
     traj_transferer      = FingerTrajectoryTransferer(GlobalVars.sim, 
                                                       init_trajectory_transferer=init_transferer, 
@@ -191,30 +193,24 @@ def do_single_task(rope_nodes, action_selection, reg_and_traj_transferer, args):
             return (False,)
 
         best_root_action = agenda[0]
+
+
         if isinstance(GlobalVars.demos[best_root_action], BootstrapDemonstration):
             print "about to run BootstrapDemonstration"
             print GlobalVars.demos[best_root_action].name
-            if GlobalVars.demos[best_root_action].aug_traj.lr2open_finger_traj == None:
-                print "no open/close info?"
-                ipy.embed()
-            elif True not in GlobalVars.demos[best_root_action].aug_traj.lr2open_finger_traj['r'] and True not in GlobalVars.demos[best_root_action].aug_traj.lr2open_finger_traj['l']:
-                print "no non-open states?"
-                ipy.embed()
-            elif True not in GlobalVars.demos[best_root_action].aug_traj.lr2close_finger_traj['r'] and True not in GlobalVars.demos[best_root_action].aug_traj.lr2close_finger_traj['l']:
-                print "no closed states?"
-                ipy.embed()
 
         test_aug_traj = reg_and_traj_transferer.transfer(GlobalVars.demos[best_root_action], scene_state, plotting=args.plotting)
         feasible, misgrasp = lfd_env.execute_augmented_trajectory(test_aug_traj, 
                                                                   step_viewer=args.animation, 
                                                                   interactive=args.interactive)
         sim.settle()
-        if misgrasp: 
+        if misgrasp:
             print "\nmisgrasp: BootstrapDemonstration is {}\n".format(isinstance(GlobalVars.demos[best_root_action], BootstrapDemonstration))
-            # ipy.embed()
             continue
+
+        warpFromRoot = test_aug_traj.reg.f
         exec_trace.append(BootstrapDemonstration(GlobalVars.ID, scene_state, test_aug_traj, 
-                                                 parent_demo = GlobalVars.demos[best_root_action]))
+                          parent_demo=GlobalVars.demos[best_root_action], warpFromRoot=warpFromRoot))
         GlobalVars.ID +=1
         if is_knot(rope.rope.GetControlPoints()):
             sim.remove_objects([rope])
@@ -233,7 +229,7 @@ def train(args):
             action_selection, reg_and_traj_transferer = add_trace(exec_result[1], args)            
         if i+1 in args.train_sizes:
             add_obj_to_group(resultf, str(i+1), GlobalVars.demos)
-        print "trained iter {}".format(i)
+        print "trained iter {}".format(i+1)
         
 def main():
     args = parse_input_args()

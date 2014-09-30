@@ -493,3 +493,120 @@ class DynamicSimulationRobotWorld(DynamicSimulation, RobotWorld):
             })
             self.constraints[lr].append(cnt)
             self.constraints_links[lr].append(grab_link)
+
+
+class DynamicRopeSimulationRobotWorld(DynamicSimulationRobotWorld):
+
+    def in_grasp_region(self,robot, lr, pt):
+        tol = .00
+
+        manip_name = {"l": "leftarm", "r": "rightarm"}[lr]
+        manip = robot.GetManipulator(manip_name)
+        l_finger = robot.GetLink("%s_gripper_l_finger_tip_link"%lr)
+        r_finger = robot.GetLink("%s_gripper_r_finger_tip_link"%lr)
+
+        def transform(hmat, p):
+            return hmat[:3,:3].dot(p) + hmat[:3,3]
+        def on_inner_side(pt, finger_lr):
+            finger = l_finger
+            closing_dir = np.cross(manip.GetLocalToolDirection(), [-1, 0, 0])
+            local_inner_pt = np.array([0.234402, -0.299, 0])/20.
+            if finger_lr == "r":
+                finger = r_finger
+                closing_dir *= -1
+                local_inner_pt[1] *= -1
+            inner_pt = transform(finger.GetTransform(), local_inner_pt)
+            return manip.GetTransform()[:3,:3].dot(closing_dir).dot(pt - inner_pt) > 0
+
+        # check that pt is behind the gripper tip
+        pt_local = transform(np.linalg.inv(manip.GetTransform()), pt)
+        if pt_local[2] > .03 + tol:
+            return False
+
+        # check that pt is within the finger width
+        if abs(pt_local[0]) > .01 + tol:
+            return False
+
+        # check that pt is between the fingers
+        if not on_inner_side(pt, "l") or not on_inner_side(pt, "r"):
+            return False
+
+        return True
+
+ 
+    def close_gripper(self, lr, step_viewer=1, max_vel=.02, close_dist_thresh=0.004, grab_dist_thresh=0.005):
+        print 'CLOSING GRIPPER'
+        # generate gripper finger trajectory
+        joint_ind = self.robot.GetJoint("%s_gripper_l_finger_joint"%lr).GetDOFIndex()
+        start_val = self.robot.GetDOFValues([joint_ind])[0]
+        print 'start_val: ', start_val
+        # execute gripper finger trajectory
+        dyn_bt_objs = [bt_obj for sim_obj in self.dyn_sim_objs for bt_obj in sim_obj.get_bullet_objects()]
+        next_val = start_val
+        while next_val:
+            flr2finger_pts_grid = self._get_finger_pts_grid(lr)
+            ray_froms, ray_tos = flr2finger_pts_grid['l'], flr2finger_pts_grid['r']
+
+            # stop closing if any ray hits a dynamic object within a distance of close_dist_thresh from both sides
+            next_vel = max_vel
+            for bt_obj in dyn_bt_objs:
+                from_to_ray_collisions = self.bt_env.RayTest(ray_froms, ray_tos, bt_obj)
+                to_from_ray_collisions = self.bt_env.RayTest(ray_tos, ray_froms, bt_obj)
+                rays_dists = np.inf * np.ones((len(ray_froms), 2))
+                for rc in from_to_ray_collisions:
+                    ray_id = np.argmin(np.apply_along_axis(np.linalg.norm, 1, ray_froms - rc.rayFrom))
+                    rays_dists[ray_id,0] = np.linalg.norm(rc.pt - rc.rayFrom)
+                for rc in to_from_ray_collisions:
+                    ray_id = np.argmin(np.apply_along_axis(np.linalg.norm, 1, ray_tos - rc.rayFrom))
+                    rays_dists[ray_id,1] = np.linalg.norm(rc.pt - rc.rayFrom)
+                colliding_rays_inds = np.logical_and(rays_dists[:,0] != np.inf, rays_dists[:,1] != np.inf)
+                if np.any(colliding_rays_inds):
+                    rays_dists = rays_dists[colliding_rays_inds,:]
+                    if np.any(np.logical_and(rays_dists[:,0] < close_dist_thresh, rays_dists[:,1] < close_dist_thresh)):
+                        next_vel = 0
+                    else:
+                        next_vel = np.minimum(next_vel, np.min(rays_dists.sum(axis=1)))
+            if next_vel == 0:
+                break
+            next_val = np.maximum(next_val - next_vel, 0)
+
+            self.robot.SetDOFValues([next_val], [joint_ind])
+            self.step()
+            if self.viewer and step_viewer:
+                self.viewer.Step()
+
+ 
+        rope = [bt_obj for sim_obj in self.dyn_sim_objs for bt_obj in sim_obj.get_bullet_objects()][0]
+        nodes, ctl_pts = rope.GetNodes(), rope.GetControlPoints()
+
+        graspable_nodes = np.array([self.in_grasp_region(self.robot, lr, n) for n in nodes])
+        graspable_ctl_pts = np.array([self.in_grasp_region(self.robot, lr, n) for n in ctl_pts])
+        graspable_inds = np.flatnonzero(np.logical_or(graspable_nodes, np.logical_or(graspable_ctl_pts[:-1], graspable_ctl_pts[1:])))
+        print 'graspable inds for %s: %s' % (lr, str(graspable_inds))
+        if len(graspable_inds) == 0:
+            return False
+
+        robot_link = self.robot.GetLink("%s_gripper_l_finger_tip_link"%lr)
+        rope_links = rope.GetKinBody().GetLinks()
+        for i_node in graspable_inds:
+            i_cnt = i_node
+            for geom in rope_links[i_cnt].GetGeometries():
+                geom.SetDiffuseColor([1.,0.,0.])
+            link = rope_links[i_cnt]
+            self._add_constraints(lr, link, link.GetTransform())
+        if step_viewer and self.viewer:
+            self.viewer.Step()
+
+        return True
+
+    def release_rope(self, lr):
+#         print 'RELEASE: %s (%d constraints)' % (lr, len(self.constraints[lr]))
+        for c in self.constraints[lr]:
+            self.bt_env.RemoveConstraint(c)
+        rope_links = self.rope.GetKinBody().GetLinks()
+        for link in self.constraints_links[lr]:
+            for geom in link.GetGeometries():
+                geom.SetDiffuseColor([1.,1.,1.])
+        self.constraints[lr] = []
+        self.constraints_links[lr] = []
+    

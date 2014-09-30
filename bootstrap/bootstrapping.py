@@ -3,7 +3,7 @@ from __future__ import division
 from core import demonstration, registration, transfer, sim_util
 from core.constants import ROPE_RADIUS, MAX_ACTIONS_TO_TRY, DEFAULT_LAMBDA, N_ITER_CHEAP, TORSO_HEIGHT, TORSO_IND
 from core.demonstration import GroundTruthRopeSceneState, AugmentedTrajectory, Demonstration, BootstrapDemonstration
-from core.simulation import DynamicSimulationRobotWorld
+from core.simulation import DynamicSimulationRobotWorld, DynamicRopeSimulationRobotWorld
 from core.environment import GroundTruthRopeLfdEnvironment
 from core.registration import BootstrapGpuTpsRpmBijRegistrationFactory, loglinspace
 from core.transfer import PoseTrajectoryTransferer, FingerTrajectoryTransferer
@@ -158,12 +158,13 @@ def add_trace(trace, args):
 def compute_action_selector(args):
     # TODO implement mem constrained GPU reg factory
     reset_cuda() # so we have as much free space on the GPU as possible
+    sim_transfer = DynamicRopeSimulationRobotWorld()
     if args.transfer_type != 'derived-traj':
         print 'only derived trajcetories are implemented currently'
         raise NotImplementedError('only derived trajcetories are implemented currently')
     reg_factory          = BootstrapGpuTpsRpmBijRegistrationFactory(GlobalVars.demos)
-    init_transferer      = PoseTrajectoryTransferer(GlobalVars.sim, **TRAJOPT_DEFAULTS)
-    traj_transferer      = FingerTrajectoryTransferer(GlobalVars.sim, 
+    init_transferer      = PoseTrajectoryTransferer(sim_transfer, **TRAJOPT_DEFAULTS)
+    traj_transferer      = FingerTrajectoryTransferer(sim_transfer, 
                                                       init_trajectory_transferer=init_transferer, 
                                                       **TRAJOPT_DEFAULTS)
     reg_and_traj_transferer = TwoStepRegistrationAndTrajectoryTransferer(reg_factory, traj_transferer)
@@ -211,7 +212,7 @@ def do_single_task(rope_nodes, action_selection, reg_and_traj_transferer, args):
             print "about to run BootstrapDemonstration"
             print GlobalVars.demos[best_root_action].name
 
-        test_aug_traj = reg_and_traj_transferer.transfer(GlobalVars.demos[best_root_action], scene_state, plotting=args.plotting)
+        test_aug_traj = reg_and_traj_transferer.transfer(GlobalVars.demos[best_root_action], scene_state, sim_state=sim_state, plotting=args.plotting)
         feasible, misgrasp = lfd_env.execute_augmented_trajectory(test_aug_traj,
                                                                   step_viewer=args.animation, 
                                                                   interactive=args.interactive)

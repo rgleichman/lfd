@@ -88,7 +88,7 @@ def gen_task_file(taskfname, num_examples, actionfname, perturb_bounds=None, num
                                                          min_rad=min_rad, max_rad=max_rad, rotation=rotation)
                 new_g = taskfile.create_group(str(i))
                 new_g['rope_nodes'] = rope_nodes
-                new_g['demo_id'] = demo_id
+                new_g['demo_id'] = str(demo_id)
         print ''
     except:
         print 'encountered exception', sys.exc_info()
@@ -110,4 +110,3 @@ def check_task_file(fname):
             success = False
     f.close()
     return success
-

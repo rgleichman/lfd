@@ -152,8 +152,6 @@ def eval_on_holdout_parallel(args, action_selection, lfd_env, sim):
     holdoutfile = h5py.File(args.eval.holdoutfile, 'r')
     holdout_items = eval_util.get_indexed_items(holdoutfile, task_list=args.tasks, task_file=args.taskfile, i_start=args.i_start, i_end=args.i_end)
 
-    ipy.embed()
-
     bts = BatchTransferSimulate(args, GlobalVars.demos)
 
     rope_params = sim_util.RopeParams()
@@ -450,7 +448,7 @@ def setup_registration_and_trajectory_transferer(args, sim):
     if args.eval.transferopt == 'pose' or args.eval.transferopt == 'finger':
         traj_transferer = PoseTrajectoryTransferer(sim_transfer, args.eval.beta_pos, args.eval.beta_rot, args.eval.gamma, args.eval.use_collision_cost)
         if args.eval.transferopt == 'finger':
-            traj_transferer = FingerTrajectoryTransferer(sim_transfer, args.eval.beta_pos, args.eval.gamma, args.eval.use_collision_cost, init_trajectory_transferer=None)
+            traj_transferer = FingerTrajectoryTransferer(sim_transfer, args.eval.beta_pos, args.eval.gamma, args.eval.use_collision_cost, init_trajectory_transferer=traj_transferer)
     else:
         raise RuntimeError("Invalid transferopt option %s"%args.eval.transferopt)
     

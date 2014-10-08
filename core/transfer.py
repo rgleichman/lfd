@@ -7,8 +7,6 @@ import demonstration
 from rapprentice import planning, resampling
 import sim_util
 
-import IPython as ipy
-
 class TrajectoryTransferer(object):
     def __init__(self, sim, beta_pos, gamma, use_collision_cost, init_trajectory_transferer=None):
         """Inits TrajectoryTransferer

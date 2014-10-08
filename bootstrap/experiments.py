@@ -228,7 +228,7 @@ def main():
         tree_sizes = args.tree_sizes
     else:
         tree_sizes = None
-    success_rate = run_bootstrap(task_fname, act_fname, boot_fname, burn_in=burn_in, tree_sizes=tree_sizes, animate=args.animate, no_cmat=args.no_cmat)
+    success_rate = run_bootstrap(task_fname, act_fname, boot_fname, burn_in=burn_in, tree_sizes=tree_sizes, animate=args.animate, no_cmat=args.no_cmat)    
     import cPickle as cp
     res_fname = osp.join(boot_dir, 'res.cp')
     with open(res_fname, 'w') as f:

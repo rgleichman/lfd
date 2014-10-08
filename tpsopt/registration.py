@@ -63,7 +63,7 @@ def unscale_tps(f, src_params, targ_params):
     return Composition([aff_in, f, aff_out])
         
 # @profile
-def tps_rpm_bij(x_nd, y_md, fsolve, gsolve, f_init = None, n_iter = 20, reg_init = .1, reg_final = .001, rad_init = .1,
+def tps_rpm_bij(x_nd, y_md, fsolve, gsolve,n_iter = 20, reg_init = .1, reg_final = .001, rad_init = .1,
                 rad_final = .005, rot_reg = 1e-3, outlierprior=1e-1, outlierfrac=2e-1, vis_cost_xy=None,
                 return_corr=False, check_solver=False):
     """
@@ -77,11 +77,8 @@ def tps_rpm_bij(x_nd, y_md, fsolve, gsolve, f_init = None, n_iter = 20, reg_init
     regs = np.around(loglinspace(reg_init, reg_final, n_iter), BEND_COEF_DIGITS)
     rads = loglinspace(rad_init, rad_final, n_iter)
 
-    if f_init == None:
-        f = ThinPlateSpline(d)
-        f.trans_g = np.median(y_md,axis=0) - np.median(x_nd,axis=0)
-    else:
-        f = f_init
+    f = ThinPlateSpline(d)
+    f.trans_g = np.median(y_md,axis=0) - np.median(x_nd,axis=0)
 
     g = ThinPlateSpline(d)
     g.trans_g = -f.trans_g

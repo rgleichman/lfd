@@ -8,7 +8,7 @@ from core.environment import GroundTruthRopeLfdEnvironment
 from core.registration import BootstrapGpuTpsRpmBijRegistrationFactory, loglinspace
 from core.transfer import PoseTrajectoryTransferer, FingerTrajectoryTransferer
 from core.registration_transfer import TwoStepRegistrationAndTrajectoryTransferer
-from core.action_selection import GreedyActionSelection, SoftmaxActionSelection
+from core.action_selection import SoftmaxActionSelection
 from core.file_utils import group_or_dataset_to_obj, add_obj_to_group
 from core.simulation_object import XmlSimulationObject, BoxSimulationObject, RopeSimulationObject
 
@@ -25,8 +25,6 @@ import numpy as np
 import argparse, sys, h5py, pprint
 
 import IPython as ipy
-
-from core.transfer_simulate import BatchTransferSimulate
 
 # TRAJOPT CONSTANTS
 TRAJOPT_DEFAULTS = {'beta_pos'           : 1000000.0,
@@ -47,6 +45,8 @@ def parse_input_args():
     parser.add_argument("trainfile", type=str, nargs = '?', default='bigdata/bootstrap/sept_13_0.1_train_0.h5')
     parser.add_argument("actionfile", type=str, nargs='?', default='bigdata/misc/overhand_actions.processed_ground_truth.h5')
 
+
+
     parser.add_argument("--animation", type=int, default=0, help="animates if it is non-zero. the viewer is stepped according to this number")
     parser.add_argument("--camera_matrix_file", type=str, default='../.camera_matrix.txt')
     parser.add_argument("--window_prop_file", type=str, default='../.win_prop.txt')
@@ -62,17 +62,13 @@ def parse_input_args():
                         help="A space separated list of the number of bootstrapping iterations each bootstrap file should be created from")
     parser.add_argument("--plotting", type=int, default=1, help="plots if animation != 0 and plotting != 0")
     parser.add_argument("--interactive", action="store_true", help="step animation and optimization if specified")
-    parser.add_argument("--method_type", type=int, default=3)
     parser.add_argument("--alpha", type=float, default=10.0)
-    parser.add_argument("--burnin", type=int, default=0)
-
     args = parser.parse_args()
     if not args.animation: args.plotting = 0
     return args
 
 class GlobalVars:
     demos = None
-    saved_bootstrap_traces = []
     lfd_env = None
     sim = None
     bend_coefs = None
@@ -168,7 +164,6 @@ def compute_action_selector(args):
                                                       **TRAJOPT_DEFAULTS)
     reg_and_traj_transferer = TwoStepRegistrationAndTrajectoryTransferer(reg_factory, traj_transferer)
     action_selection = SoftmaxActionSelection(reg_factory, alpha = args.alpha)
-    # action_selection = GreedyActionSelection(reg_factory)
     
     return action_selection, reg_and_traj_transferer
 
@@ -199,20 +194,12 @@ def do_single_task(rope_nodes, action_selection, reg_and_traj_transferer, args):
 
         best_root_action = agenda[0]
 
-        # bts = BatchTransferSimulate(TRAJOPT_DEFAULTS, GlobalVars.demos)
-        # for i in range(min(len(agenda), 20)):
-        #     bts.queue_transfer_simulate(sim_state, scene_state, agenda[i], str(i)+"_next")
-        # bts.wait_while_queue_is_nonempty()
-        # res = bts.get_results()
-        # print res
-        # ipy.embed()
-
         if isinstance(GlobalVars.demos[best_root_action], BootstrapDemonstration):
             print "about to run BootstrapDemonstration"
             print GlobalVars.demos[best_root_action].name
 
         test_aug_traj = reg_and_traj_transferer.transfer(GlobalVars.demos[best_root_action], scene_state, plotting=args.plotting)
-        feasible, misgrasp = lfd_env.execute_augmented_trajectory(test_aug_traj,
+        feasible, misgrasp = lfd_env.execute_augmented_trajectory(test_aug_traj, 
                                                                   step_viewer=args.animation, 
                                                                   interactive=args.interactive)
         sim.settle()
@@ -221,7 +208,7 @@ def do_single_task(rope_nodes, action_selection, reg_and_traj_transferer, args):
             continue
 
         warpFromRoot = test_aug_traj.reg.f
-        exec_trace.append(BootstrapDemonstration(GlobalVars.ID, scene_state, test_aug_traj, method=args.method_type, 
+        exec_trace.append(BootstrapDemonstration(GlobalVars.ID, scene_state, test_aug_traj, 
                           parent_demo=GlobalVars.demos[best_root_action], warpFromRoot=warpFromRoot))
         GlobalVars.ID +=1
         if is_knot(rope.rope.GetControlPoints()):
@@ -237,15 +224,8 @@ def train(args):
     for i in range(args.train_sizes[-1]):
         rope_nodes = trainf[str(i)]['rope_nodes'][:]
         exec_result = do_single_task(rope_nodes, action_selection, reg_and_traj_transferer, args)
-        if i == args.burnin:
-            for res in GlobalVars.saved_bootstrap_traces:
-                if res[0]:
-                    action_selection, reg_and_traj_transferer = add_trace(res[1], args)
         if exec_result[0]:
-            if i >= args.burnin:
-                action_selection, reg_and_traj_transferer = add_trace(exec_result[1], args)
-            else:
-                GlobalVars.saved_bootstrap_traces.append(exec_result)
+            action_selection, reg_and_traj_transferer = add_trace(exec_result[1], args)            
         if i+1 in args.train_sizes:
             add_obj_to_group(resultf, str(i+1), GlobalVars.demos)
         print "trained iter {}".format(i+1)

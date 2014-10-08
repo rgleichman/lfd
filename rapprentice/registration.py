@@ -32,7 +32,7 @@ rot_matrices = [np.matrix([[np.cos(theta), -1*np.sin(theta), 0],
 
 
 
-class Transformation(object):
+class Transformation(object): # ParallelPython can only handle old-style classes (i.e. don't inherit Transformation from object)
     """
     Object oriented interface for transformations R^d -> R^d
     """

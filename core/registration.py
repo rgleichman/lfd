@@ -339,10 +339,7 @@ class BootstrapGpuTpsRpmBijRegistrationFactory(GpuTpsRpmBijRegistrationFactory):
             vis_cost_xy = None
 
         try:
-            if demo.method == 3:
-                old_cloud = demo.get_cloud()[:,:3]
-            else:
-                old_cloud = demo.scene_state.cloud[:,:3]
+            old_cloud = demo.get_cloud()[:,:3]
         except AttributeError: #demo is not a BootstrapDemonstration
             old_cloud = demo.scene_state.cloud[:,:3]
         new_cloud = test_scene_state.cloud[:,:3]
@@ -367,15 +364,7 @@ class BootstrapGpuTpsRpmBijRegistrationFactory(GpuTpsRpmBijRegistrationFactory):
         gsolve = self.g_empty_solver.get_solver(scaled_y_md, y_K_nn, self.exact_bend_coefs)
 
         x_weights = np.ones(len(x_nd)) * 1.0/len(x_nd)
-
-        print "IN REGISTRATION"
-        f_init = None
-        if hasattr(demo, "method") and demo.method == 2:
-            f_init = demo.get_warps()[0].fs[1] #extract ThinPlateSpline from Composition
-            if type(f_init) != tpsopt.transformations.ThinPlateSpline:
-                ipy.embed()
         (f,g), corr = tpsopt.registration.tps_rpm_bij(scaled_x_nd, scaled_y_md, fsolve, gsolve,
-                                    f_init = f_init,
                                     n_iter = N_ITER_EXACT,
                                     reg_init = EXACT_LAMBDA[0],
                                     reg_final = EXACT_LAMBDA[1],
@@ -391,13 +380,10 @@ class BootstrapGpuTpsRpmBijRegistrationFactory(GpuTpsRpmBijRegistrationFactory):
         f = registration.unscale_tps(f, src_params, targ_params)
         f._bending_cost = bending_cost # TODO: do this properly
         try:
-            if demo.method == 3:
-                print "registration: creating Composition"
-                fs = demo.get_warps() + [f] 
-                fnew = Composition(fs)
-                print "registration: finished"
-            else:
-                fnew = f
+            print "registration: creating Composition"
+            fs = demo.get_warps() + [f] 
+            fnew = Composition(fs)
+            print "registration: finished"
         except AttributeError: #demo is not a BootstrapDemonstration
             fnew = f
             from demonstration import BootstrapDemonstration

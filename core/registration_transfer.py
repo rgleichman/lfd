@@ -1,5 +1,4 @@
 from __future__ import division
-from core.simulation import DynamicRopeSimulationRobotWorld
 
 class RegistrationAndTrajectoryTransferer(object):
     def __init__(self, registration_factory, trajectory_transferer):
@@ -19,10 +18,7 @@ class RegistrationAndTrajectoryTransferer(object):
         raise NotImplementedError
 
 class TwoStepRegistrationAndTrajectoryTransferer(RegistrationAndTrajectoryTransferer):
-    def transfer(self, demo, test_scene_state, sim_state = None, plotting=False):
-        sim = DynamicRopeSimulationRobotWorld()
-        sim.set_state(sim_state)
-        self.trajectory_transferer.set_sim(sim)
+    def transfer(self, demo, test_scene_state, plotting=False):
         reg = self.registration_factory.register(demo, test_scene_state)
         print 'computed registration'
         test_aug_traj = self.trajectory_transferer.transfer(reg, demo, plotting=plotting)

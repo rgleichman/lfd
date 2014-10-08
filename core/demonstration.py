@@ -39,7 +39,7 @@ class Demonstration(object):
 
 class BootstrapDemonstration(Demonstration):
 
-    def __init__(self, UID, scene_state, aug_traj, method=3, solver_data=None, parent_demo=None, warpFromRoot=None):
+    def __init__(self, UID, scene_state, aug_traj, solver_data=None, parent_demo=None, warpFromRoot=None):
         if parent_demo is None:
             parent_name = 'root'
         else:
@@ -54,22 +54,45 @@ class BootstrapDemonstration(Demonstration):
         self.aug_traj = parent_demo.aug_traj
         self.scene_state = parent_demo.scene_state
         self.solver_data = solver_data
-        self.method = method
 
     def compute_solver_data(self, bend_coefs):
         x_nd = self.get_cloud()
         l_traj = None; r_traj = None
-        if 'l' in self.aug_traj.lr2ee_traj:
-            l_traj = self.aug_traj.lr2ee_traj['l'][:, :3, 3]
-        if 'r' in self.aug_traj.lr2ee_traj:
-            r_traj = self.aug_traj.lr2ee_traj['r'][:, :3, 3]
+        lr2ee_traj = self.get_ee_traj()
+        if 'l' in lr2ee_traj:
+            l_traj = lr2ee_traj['l'][:, :3, 3]
+        if 'r' in lr2ee_traj:
+            r_traj = lr2ee_traj['r'][:, :3, 3]
         self.solver_data = ds_and_precompute(x_nd, bend_coefs,
                                              l_traj, r_traj)
 
-    def get_cloud(self): #this is bad, breaks SceneState abstraction
+    def get_cloud(self):             #this is bad, breaks SceneState abstraction
+        # if not isinstance(self.parent, BootstrapDemonstration):
+        #     parent_cloud = self.parent.scene_state.transfer_cld()
+        # else:
+        #     parent_cloud = self.parent.get_cloud()
+        # return self.warpFromParent.transform_points(parent_cloud)
         return self.warpFromRoot.transform_points(self.scene_state.cloud)
 
+    def get_ee_traj(self):
+        # if not isinstance(self.parent, BootstrapDemonstration):
+        #     parent_traj = self.parent.aug_traj.lr2ee_traj
+        # else:
+        #     parent_traj = self.parent.get_ee_traj()
+        # ee_traj = {}
+        # for k in parent_traj.keys():
+        #     ee_traj[k] = self.warpFromParent.transform_hmats(parent_traj[k])
+        # return ee_traj
+        ee_traj = {}
+        for k in self.aug_traj.lr2ee_traj.keys():
+            ee_traj[k] = self.warpFromRoot.transform_hmats(self.aug_traj.lr2ee_traj[k])
+        return ee_traj
+
     def get_warps(self): #returns a list of warps between BootstrapDemonstrations in order from ancestor (original demo) to child
+        # if isinstance(self.parent, BootstrapDemonstration):
+        #     return [warpFromParent]
+        # else:
+        #     return self.parent.get_warps + warpFromParent
         return [self.warpFromRoot]
 
 class SceneState(object):
